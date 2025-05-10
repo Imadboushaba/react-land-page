@@ -1,18 +1,47 @@
-name: Deploy landing page
+name: React Production Deploy
 
 on:
   push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+    branches:
+      - main
 
 jobs:
-  build:
-
+  deploy-react:
+    name: 🚀 React Production Deployment
     runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v2
 
-    - name: Deploy react app to github pages
-      uses: tanwanimohit/deploy-react-to-ghpages@v1.0.1
+    steps:
+
+      - name: 🔗 Set up SSH for EC2 access
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: 🚀 Deploy React App on EC2 with npm
+        run: |
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ${{ secrets.EC2_HOST }}@${{ secrets.EC2_HOST }} << 'EOF'
+            set -e
+            echo "📂 Navigating to React app dir..."
+            cd /var/www/react-app
+
+            echo "📥 Pulling latest code..."
+            git pull origin ${{ github.ref_name }}
+
+            echo "📦 Installing dependencies with npm..."
+            npm install --ignore-scripts
+
+            echo "🛠 Building the React app..."
+            npm run build
+
+            echo "🔁 Syncing build to production folder..."
+            BUILD_DIR=/tmp/react-build
+            rm -rf $BUILD_DIR
+            mkdir -p $BUILD_DIR
+            cp -r build/* $BUILD_DIR
+
+            rsync -av --delete --no-perms --no-owner --no-group $BUILD_DIR/ /var/www/react/ || echo "⚠️ rsync finished with warnings, but continuing..."
+
+            echo "✅ React deployment completed with npm!"
+          EOF
