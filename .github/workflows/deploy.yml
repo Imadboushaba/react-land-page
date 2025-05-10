@@ -9,7 +9,6 @@ jobs:
   deploy-react:
     name: 🚀 React Production Deployment
     runs-on: ubuntu-latest
-
     steps:
 
       - name: 🔗 Set up SSH for EC2 access
